@@ -1,0 +1,190 @@
+(() => {
+    "use strict";
+
+    class App {
+        static get previousUrl() {
+            let { url } = this;
+
+            try {
+                const previousUrl = localStorage.getItem("previousUrl");
+
+                if (previousUrl && previousUrl.indexOf(url) === 0) {
+                    url = previousUrl;
+                }
+            } catch (e) {}
+
+            return url;
+        }
+
+        static set previousUrl(url) {
+            try {
+                localStorage.setItem("previousUrl", url);
+            } catch (e) {}
+        }
+
+        static get url() {
+            // website url
+            const url = atob("aHR0cHM6Ly9teWdyb3pvbi5jb20v");
+            return url;
+        }
+
+        static exit() {
+            navigator.notification.confirm("Confirm close", (exit) => {
+                if (exit === 1) {
+                    navigator.app.exitApp();
+                } else {
+                    location.reload();
+                }
+            }, "Confirm");
+        }
+
+        static splashscreen(status) {
+            if (status) {
+                navigator.splashscreen.show();
+            } else {
+                navigator.splashscreen.hide();
+            }
+        }
+    }
+
+    class MessageAction {
+        static beep(data, message) {
+            const count = data.count || 1;
+            navigator.notification.beep(count);
+
+            message.send({
+                action: data.action,
+                status: 1
+            });
+        }
+
+        static async razorpay(data, message) {
+            const payment = await new Promise((callback) => {
+                const payment = {
+                    status: 0,
+                    id: ""
+                };
+
+                if (typeof RazorpayCheckout === "undefined"
+                    || !data.options
+                ) {
+                    callback(payment);
+                    return;
+                }
+
+                RazorpayCheckout.on("payment.success", (rdata) => {
+                    payment.status = 1;
+                    payment.id = rdata.razorpay_payment_id;
+
+                    callback(payment);
+                });
+
+                RazorpayCheckout.on("payment.cancel", () => {
+                    callback(payment);
+                });
+
+                RazorpayCheckout.open(data.options);
+            });
+
+            message.send({
+                action: data.action,
+                status: payment.status,
+                id: payment.id
+            });
+        }
+    }
+
+    class AppMessage {
+        action(data) {
+            if (data.action in MessageAction) {
+                MessageAction[data.action](data, this);
+            }
+        }
+
+        initListener() {
+            const { awindow } = this;
+
+            awindow.addEventListener("message", (e) => {
+                if (e.type !== "message" || !e.data || !e.data.action) {
+                    return;
+                }
+
+                this.action(e.data);
+            });
+        }
+
+        send(data) {
+            const { awindow } = this;
+
+            let code = "(window._iap = window._iap || []).push(";
+            code += JSON.stringify(data);
+            code += ");";
+
+            awindow.executeScript({ code: code });
+        }
+
+        constructor(awindow) {
+            this.awindow = awindow;
+            this.initListener();
+        }
+    }
+
+    class AppWindow {
+        initErrorListener() {
+            const { awindow } = this;
+
+            awindow.addEventListener("loaderror", () => {
+                this.error = true;
+                App.splashscreen(true);
+                awindow.close();
+            });
+        }
+
+        initExitListener() {
+            const { awindow, error } = this;
+
+            awindow.addEventListener("exit", () => {
+                App.splashscreen(true);
+
+                if (error) {
+                    document.querySelector("#error").classList.remove("hide");
+                } else {
+                    App.exit();
+                }
+
+                App.splashscreen(false);
+            });
+        }
+
+        initStartListener() {
+            const { awindow } = this;
+
+            awindow.addEventListener("loadstart", (e) => {
+                App.previousUrl = e.url;
+            });
+        }
+
+        constructor(url) {
+            const awindow = cordova.InAppBrowser.open(
+                url,
+                "_blank",
+                "location=no,clearcache=no,zoom=no,footer=no"
+            );
+
+            this.error = false;
+            this.awindow = awindow;
+
+            this.initStartListener();
+            this.initErrorListener();
+            this.initExitListener();
+
+            new AppMessage(awindow);
+        }
+    }
+
+    function init() {
+        new AppWindow(App.previousUrl);
+    }
+
+    init();
+})();
