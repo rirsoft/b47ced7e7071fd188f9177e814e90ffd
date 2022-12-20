@@ -10,6 +10,7 @@
 
                 if (previousUrl && previousUrl.indexOf(url) === 0) {
                     url = previousUrl;
+                    localStorage.setItem("previousUrl", "");
                 }
             } catch (e) {}
 
@@ -70,6 +71,12 @@
                 ) {
                     callback(payment);
                     return;
+                }
+
+                const url = data.url || "";
+
+                if (url) {
+                    App.previousUrl = url;
                 }
 
                 RazorpayCheckout.on("payment.success", (rdata) => {
@@ -141,9 +148,11 @@
         }
 
         initExitListener() {
-            const { awindow, error } = this;
+            const { awindow } = this;
 
             awindow.addEventListener("exit", () => {
+                const { error } = this;
+
                 App.splashscreen(true);
 
                 if (error) {
@@ -153,14 +162,6 @@
                 }
 
                 App.splashscreen(false);
-            });
-        }
-
-        initStartListener() {
-            const { awindow } = this;
-
-            awindow.addEventListener("loadstart", (e) => {
-                App.previousUrl = e.url;
             });
         }
 
@@ -174,7 +175,6 @@
             this.error = false;
             this.awindow = awindow;
 
-            this.initStartListener();
             this.initErrorListener();
             this.initExitListener();
 
