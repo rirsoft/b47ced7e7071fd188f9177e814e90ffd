@@ -59,6 +59,17 @@
             });
         }
 
+        static previousUrl(data, message) {
+            const url = data.url || "";
+
+            App.previousUrl = url;
+
+            message.send({
+                action: data.action,
+                status: 1
+            });
+        }
+
         static async razorpay(data, message) {
             const payment = await new Promise((callback) => {
                 const payment = {
@@ -112,7 +123,7 @@
             const { awindow } = this;
 
             awindow.addEventListener("message", (e) => {
-                if (e.type !== "message" || !e.data || !e.data.action) {
+                if (!e.data || !e.data.action) {
                     return;
                 }
 
