@@ -119,6 +119,8 @@
                 action: data.action,
                 status: 1
             });
+
+            navigator.app.exitApp();
         }
     }
 
